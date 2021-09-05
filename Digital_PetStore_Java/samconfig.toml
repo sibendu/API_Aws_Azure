@@ -1,0 +1,10 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "petstore"
+s3_bucket = "aws-sam-cli-managed-default-samclisourcebucket-p57b8si0e3aq"
+s3_prefix = "petstore"
+region = "eu-west-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
