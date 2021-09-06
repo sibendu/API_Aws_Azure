@@ -1,0 +1,87 @@
+parameters:
+
+  - name: jobName
+    displayName: jobName
+    type: string
+  - name: serviceName
+    displayName: serviceName
+    type: string
+  - name: serviceEnv
+    displayName: serviceEnv
+    type: string
+  - name: serviceVersion
+    displayName: serviceVersion
+    type: string    
+  - name: azureArtifactName
+    displayName: azureArtifactName
+    type: string
+    default: BuildOutput 
+  - name: awsArtifactBucket
+    displayName: awsArtifactBucket
+    type: string
+  - name: awsRegion
+    displayName: awsRegion
+    type: string
+  - name: awsCredentials
+    displayName: awsCredentials
+    type: string
+  - name: awsRoleArn
+    displayName: awsRoleArn
+    type: string
+
+
+jobs:
+  - deployment: ${{parameters.jobName}}
+    pool:
+      vmImage: ubuntu-18.04
+    variables:
+      stackName: ${{parameters.serviceName}}-${{parameters.serviceEnv}}
+    environment: ${{parameters.serviceName}}-${{parameters.serviceEnv}}
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: DownloadPipelineArtifact@2
+              displayName: Download build artifact
+              inputs:
+                artifact: ${{parameters.azureArtifactName}}
+                path: $(System.DefaultWorkingDirectory)
+
+            - task: AWSCLI@1
+              displayName: Package CloudFormation template
+              inputs:
+                awsCredentials: ${{parameters.awsCredentials}}
+                regionName: ${{parameters.awsRegion}}
+                awsCommand: cloudformation
+                awsSubCommand: package
+                awsArguments: --template-file template.yml --output-template-file output-sam.yml --s3-bucket ${{parameters.awsArtifactBucket}}  
+
+                
+            - task: CloudFormationCreateOrUpdateStack@1
+              displayName: Deploy CloudFormation template
+              inputs:
+                awsCredentials: ${{parameters.awsCredentials}}
+                regionName: ${{parameters.awsRegion}}
+                roleARN: ${{parameters.awsRoleArn}}
+                s3BucketName: ${{parameters.awsArtifactBucket}}
+                stackName: $(stackName)
+                changeSetName: $(stackName)
+                useChangeSet: true
+                templateSource: file
+                templateFile: output-sam.yml
+                templateParametersSource: inline
+                templateParameters: |
+                  [
+                   {
+                      "ParameterKey": "ServiceName",
+                      "ParameterValue": "${{parameters.serviceName}}"
+                   },
+                   {
+                      "ParameterKey": "ServiceVersion",
+                      "ParameterValue": "${{parameters.serviceVersion}}"
+                   },
+                   {
+                      "ParameterKey": "ServiceEnvironment",
+                      "ParameterValue": "${{parameters.serviceEnv}}"
+                   }
+                  ]
