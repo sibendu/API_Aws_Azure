@@ -1,0 +1,49 @@
+parameters:
+
+  - name: serviceName
+    displayName: Service name
+    type: string
+
+  - name: awsRoleName
+    displayName: AWS deployment role name
+    type: string
+    default: AWSITGS-Developer
+
+  - name: postmanWorkspace
+    displayName: Postman workspace id
+    type: string
+    default: 3ca64750-b6cb-43e0-a80e-aab381057255
+
+  - name: environments
+    displayName: List of environments
+    type: object
+    default: []
+
+stages:
+
+  - stage: Build
+    jobs:
+      - template: azure-build.yml
+
+  - ${{ each environment in parameters.environments }}:
+    - stage: Deploy_${{upper(environment.name)}}
+      jobs:
+        - ${{ if eq(environment.approval, true) }}:
+          - job: Approval
+            pool: server
+            steps:
+              - task: ManualValidation@0
+                inputs:
+                  instructions: Approve ${{upper(environment.name)}} deployment?
+
+        - template: azure-deploy.yml
+          parameters:
+            jobName: Deploy
+            serviceName: ${{parameters.serviceName}}
+            serviceEnv: ${{environment.name}}
+            awsArtifactBucket: ${{environment.awsArtifactBucket}} 
+            awsCredentials: aws_sandbox
+            awsRegion: ${{environment.awsRegion}}
+            awsRoleArn: arn:aws:iam::${{environment.awsAccount}}:role/${{environment.awsRoleName}}
+            ${{ if eq(environment.approval, true) }}:
+              dependsOnJob: Approval

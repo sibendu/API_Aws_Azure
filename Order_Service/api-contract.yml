@@ -1,0 +1,123 @@
+openapi: 3.0.1
+info:
+  title: OpenAPI definition
+  version: v0
+  
+servers:
+- url: https://ek9wmj3ank.execute-api.{region}.amazonaws.com/stg-{environment}
+  description: Generated server url
+  variables:
+    environment:
+      default: dev
+      enum:
+        - dev
+        - tst
+    region:
+      default: eu-west-1
+      enum:
+        - eu-west-1
+
+security:
+  - apiKey: []
+  
+paths:
+  /greeting:
+    get:
+      tags:
+      - greeting-controller      
+      operationId: greeting
+      security:
+        - apiKey: []  
+          oauth2:
+            - 'ostest_apis/read'           
+      parameters:
+        - $ref: '#/components/parameters/apiKey'
+        - $ref: '#/components/parameters/name'          
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Greeting'
+        
+    post:
+      tags:
+      - greeting-controller
+      operationId: greeting
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Greeting'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Greeting'                 
+       
+components:
+
+  headers:
+
+    ContentType:
+      schema:
+        type: string
+      description: Content type served by the API. (application/json)
+      example: application/json
+
+  parameters:
+
+    apiKey:
+      name: Api-Key
+      description: API client identifier.
+      in: header
+      required: true
+      schema:
+        type: string
+      example: ad3ed34fdsf32322
+    
+    name:
+      name: name
+      in: query
+      required: false
+      schema:
+        type: string
+        default: World
+  requestBodies:
+
+    OrderCreationRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/OrderCreationRequest'
+
+  schemas:
+    Greeting:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        content:
+          type: string      
+
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      name: Api-Key
+      in: header
+    oauth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: >-
+            https://ostest.auth.eu-west-1.amazoncognito.com/oauth2/token
+          scopes:
+            'ostest_apis/read': Read
+            'ostest_apis/write': Write 
+          

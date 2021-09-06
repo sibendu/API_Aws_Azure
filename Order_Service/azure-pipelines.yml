@@ -1,0 +1,25 @@
+name: Greeting_Service-CI
+  
+trigger:
+  - main
+     
+resources:
+  repositories:
+    - repository: azure-devops-templates
+      type: git
+      name: test/Digital_BaseFormation
+        
+stages:
+  - template: 01-azure-pipelines/azure-stages-default.yml@azure-devops-templates
+    parameters:
+      serviceName: GreetingService
+      environments:
+        - name: dev
+          approval: false
+          awsAccount: 729524366783
+          awsRegion: eu-west-1
+          awsRoleName: AzureDeployer
+          awsArtifactBucket: api-artifacts-11
+
+
+   

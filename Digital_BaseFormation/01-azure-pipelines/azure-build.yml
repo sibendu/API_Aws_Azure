@@ -1,0 +1,67 @@
+parameters:
+  vmImage: ubuntu-18.04
+  pythonVersion: '3.8'
+  azureArtifactName: BuildOutput
+
+jobs:
+  - job: Build
+    pool:
+      vmImage: ${{parameters.vmImage}}
+    steps:    
+
+      - script: |
+         echo  $(Build.SourceVersion)
+        displayName: 'Install dependencies'
+
+      - task: UsePythonVersion@0
+        displayName: Install Python
+        inputs:
+          versionSpec: ${{parameters.pythonVersion}}
+
+      - bash: ./build.sh
+        displayName: Execute build script to generate cloudformation
+
+      - task: Gradle@2
+        displayName: Build 
+        inputs:
+          workingDirectory: ''
+          gradleWrapperFile: 'gradlew'
+          gradleOptions: '-Xmx5122m'
+          javaHomeOption: 'JDKVersion'
+          jdkVersionOption: '1.8'
+          jdkArchitectureOption: 'x64'
+          publishJUnitResults: false
+          testResultsFiles: '**/TEST-*.xml'
+          tasks: 'buildZip'
+
+      - task: Gradle@2
+        displayName: Build 
+        inputs:
+          workingDirectory: ''
+          gradleWrapperFile: 'gradlew'
+          gradleOptions: '-Xmx5122m'
+          javaHomeOption: 'JDKVersion'
+          jdkVersionOption: '1.8'
+          jdkArchitectureOption: 'x64'
+          publishJUnitResults: false
+          testResultsFiles: '**/TEST-*.xml'
+          tasks: 'test'
+
+      # Publish Test Results
+      # Publish test results to Azure Pipelines
+      - task: PublishTestResults@2
+        inputs:
+          testResultsFormat: 'JUnit' # Options: JUnit, NUnit, VSTest, xUnit, cTest
+          testResultsFiles: '**/TEST-*.xml' 
+          #searchFolder: '$(System.DefaultWorkingDirectory)' # Optional
+          mergeTestResults: true # Optional
+          #failTaskOnFailedTests: false # Optional
+          testRunTitle: $(Build.SourceVersion) # Optional
+          #buildPlatform: # Optional
+          #buildConfiguration: # Optional
+          #publishRunAttachments: true # Optional
+
+      - publish: $(System.DefaultWorkingDirectory)
+        artifact: ${{parameters.azureArtifactName}}
+        displayName: Publish build artifact
+       

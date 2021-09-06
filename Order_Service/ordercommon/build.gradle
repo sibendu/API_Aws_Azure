@@ -1,0 +1,3 @@
+plugins {
+    id 'com.sd.example.java-library-conventions'
+}

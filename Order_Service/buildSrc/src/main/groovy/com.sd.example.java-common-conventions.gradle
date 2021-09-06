@@ -1,0 +1,98 @@
+plugins {
+    // Apply the java Plugin to add support for Java.
+    id 'java' 
+}
+
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+//Configures the classpath and the source and resource directories
+//of the integrationTest task.
+sourceSets {
+    //Declaring this source set creates compile time and runtime configurations for it.
+    integrationTest {
+        java {
+            compileClasspath += main.output + test.output
+            runtimeClasspath += main.output + test.output
+            srcDir file('src/integration-test/java')
+        }
+        resources.srcDir file('src/integration-test/resources')
+    }
+
+    functionalTest {
+        java {
+            compileClasspath += main.output + test.output
+            runtimeClasspath += main.output + test.output
+            srcDir file('src/functional-test/java')
+        }
+        resources.srcDir file('src/functional-test/resources')
+    }
+}
+
+//Configures the compile and runtime configurations for our integration tests
+//and includes the dependencies of the test task.
+configurations {
+    integrationTestCompile.extendsFrom testCompile
+    integrationTestRuntime.extendsFrom testRuntime
+   
+    functionalTestCompile.extendsFrom testCompile
+    functionalTestRuntime.extendsFrom testRuntime 
+}
+	
+dependencies {
+
+    // Use JUnit Jupiter API for testing.
+    testCompile 'org.junit.jupiter:junit-jupiter-api:5.6.2'
+	testCompile 'org.springframework.boot:spring-boot-starter-test:2.4.1'
+	
+	//integrationTestCompile 'org.assertj:assertj-core:3.0.0'
+	//functionalTestCompile 'org.assertj:assertj-core:3.0.0'
+}
+
+
+test {
+    useJUnitPlatform()
+}
+
+//Create the task that runs the integration tests found from the
+//configured source directory and uses the correct classpath.
+task integrationTest(type: Test) {
+	
+	useJUnitPlatform()
+    description = 'Runs integration tests.'
+	group = 'verification'
+	
+    testClassesDirs = sourceSets.integrationTest.output.classesDirs
+    classpath = sourceSets.integrationTest.runtimeClasspath
+    //If you want to ensure that integration tests are run every time when you invoke
+    //this task, uncomment the following line.
+    outputs.upToDateWhen { false }
+}
+
+task functionalTest(type: Test) {
+	
+	useJUnitPlatform()
+    description = 'Runs functional tests.'
+	group = 'verification'
+	
+    testClassesDirs = sourceSets.functionalTest.output.classesDirs
+    classpath = sourceSets.functionalTest.runtimeClasspath
+    //If you want to ensure that functional tests are run every time when you invoke
+    //this task, uncomment the following line.
+    outputs.upToDateWhen { false }
+}
+
+//Ensure that the check task fails the build if there are failing integration tests.
+//check.dependsOn integrationTest
+
+//Ensure that our unit tests are run before our integration or functional tests
+integrationTest.mustRunAfter test
+functionalTest.mustRunAfter test
+		

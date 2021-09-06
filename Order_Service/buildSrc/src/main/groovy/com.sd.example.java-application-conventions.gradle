@@ -1,0 +1,17 @@
+plugins {
+    // Apply the common convention plugin for shared build configuration between library and application projects.
+    id 'com.sd.example.java-common-conventions'
+
+    // Apply the application plugin to add support for building a CLI application in Java.
+    id 'application'
+}
+
+task buildZip(type: Zip) {
+    from compileJava
+    from processResources
+    into('lib') {
+        from configurations.runtimeClasspath
+    }
+}
+
+build.dependsOn buildZip

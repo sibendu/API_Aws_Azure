@@ -1,0 +1,98 @@
+paths:
+  /greeting:
+    get:
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiProxyLambda.Arn}/invocations
+        httpMethod: POST
+        passthroughBehavior: never
+        timeoutInMillis: 15000
+        
+    post:                
+      x-amazon-apigateway-integration:
+        type: aws_proxy
+        uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiProxyLambda.Arn}/invocations
+        httpMethod: POST
+        passthroughBehavior: never
+        timeoutInMillis: 20000          
+
+components:
+  securitySchemes:
+    apiKey:
+      name: x-api-key  
+
+    oauth2:
+      type: apiKey
+      name: Authorization
+      in: header
+      x-amazon-apigateway-authtype: cognito_user_pools
+      x-amazon-apigateway-authorizer:
+        type: cognito_user_pools
+        providerARNs:
+          - 'arn:aws:cognito-idp:eu-west-1:729524366783:userpool/eu-west-1_gg1n7mzi4'
+                  
+x-amazon-apigateway-request-validator: basic
+
+x-amazon-apigateway-request-validators:
+  basic:
+    validateRequestBody: True
+    validateRequestParameters: True
+  params-only:
+    validateRequestBody: False
+    validateRequestParameters: True
+    
+x-amazon-apigateway-gateway-responses:
+  ACCESS_DENIED:
+    statusCode: '403'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "403", "code": "$context.error.responseType", "title": $context.error.messageString}]}'
+
+  BAD_REQUEST_BODY:
+    statusCode: '400'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "400", "code": "BAD_REQUEST", "title": $context.error.messageString}]}'
+
+  BAD_REQUEST_PARAMETERS:
+    statusCode: '400'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "400", "code": "$context.error.responseType", "title": $context.error.messageString}]}'
+
+  DEFAULT_4XX:
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "400", "code": "BAD_REQUEST", "title": $context.error.messageString}]}'
+
+  DEFAULT_5XX:
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "500", "code": "SERVER_ERROR", "title": $context.error.messageString}]}'
+
+  EXPIRED_TOKEN:
+    statusCode: '403'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "403", "code": "$context.error.responseType", "title": $context.error.messageString}]}'
+
+  INTEGRATION_FAILURE:
+    statusCode: '504'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "504", "code": "$context.error.responseType", "title": $context.error.messageString}]}'
+
+  INTEGRATION_TIMEOUT:
+    statusCode: '504'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "504", "code": "$context.error.responseType", "title": $context.error.messageString}]}'
+
+  INVALID_API_KEY:
+    statusCode: '403'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "403", "code": "$context.error.responseType", "title": $context.error.messageString}]}'
+
+  QUOTA_EXCEEDED:
+    statusCode: '429'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "429", "code": "$context.error.responseType", "title": $context.error.messageString}]}'
+
+  UNAUTHORIZED:
+    statusCode: '401'
+    responseTemplates:
+      'application/json': '{"errors": [{"id": "$context.requestId", "status": "401", "code": "$context.error.responseType", "title": $context.error.messageString}]}'
+
+                   

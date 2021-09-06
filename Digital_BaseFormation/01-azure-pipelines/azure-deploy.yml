@@ -1,0 +1,123 @@
+parameters:
+  jobName:
+  dependsOnJob: []
+  serviceName:
+  serviceEnv:
+  awsArtifactBucket:
+  awsRegion: eu-west-1
+  awsCredentials:
+  awsRoleArn:
+  azureArtifactName: BuildOutput
+
+jobs:
+  - job: ${{parameters.jobName}}
+    pool:
+      vmImage: ubuntu-18.04
+    variables:
+      stackName: ${{parameters.serviceName}}-${{parameters.serviceEnv}}
+
+    steps:
+
+      - checkout: none
+        displayName: Skip checkout
+
+      - task: DownloadPipelineArtifact@2
+        displayName: Download build artifact
+        inputs:
+          artifact: ${{parameters.azureArtifactName}}
+          path: $(System.DefaultWorkingDirectory)
+
+
+      # Bash
+      - task: Bash@3
+        inputs:
+          filePath: collect.sh
+          arguments: $(Build.SourceVersion)
+          #script: '# echo Hello world' # Required when targetType == inline
+          #workingDirectory: # Optional
+          #failOnStderr: false # Optional
+          #noProfile: true # Optional
+          #noRc: true # Optional  
+
+      - task: S3Upload@1
+        inputs:
+          awsCredentials: '${{parameters.awsCredentials}}'
+          regionName: '${{parameters.awsRegion}}'
+          bucketName: '${{parameters.awsArtifactBucket}}'
+          sourceFolder: '$(System.DefaultWorkingDirectory)/dist/'
+          targetFolder: '${{parameters.serviceName}}/${{parameters.serviceEnv}}'
+          globExpressions: '*.zip'
+          createBucket: false
+
+      - task: S3Upload@1
+        inputs:
+          awsCredentials: '${{parameters.awsCredentials}}'
+          regionName: '${{parameters.awsRegion}}'
+          bucketName: '${{parameters.awsArtifactBucket}}'
+          sourceFolder: '$(System.DefaultWorkingDirectory)/target/'
+          targetFolder: '${{parameters.serviceName}}/${{parameters.serviceEnv}}'
+          globExpressions: '*'
+          createBucket: false
+
+      - task: CloudFormationCreateOrUpdateStack@1
+        displayName: Deploy them all
+        inputs:
+          awsCredentials: '${{parameters.awsCredentials}}'
+          regionName: '${{parameters.awsRegion}}'
+          stackName: '${{parameters.serviceEnv}}-${{parameters.serviceName}}'
+          templateParametersSource: inline
+          templateFile: target/cloudformation.yml
+          capabilityIAM: 'true' 
+          capabilityNamedIAM: 'true'
+          templateParameters: |
+            [
+             {
+                "ParameterKey": "ServiceName",
+                "ParameterValue": "${{parameters.serviceName}}"
+             },
+             {
+                "ParameterKey": "ServiceEnvironment",
+                "ParameterValue": "${{parameters.serviceEnv}}"
+             },
+             {
+                "ParameterKey": "LambdaSourceBucket",
+                "ParameterValue": "${{parameters.awsArtifactBucket}}"
+             },
+             {
+                "ParameterKey": "LambdaSourceBucketPrefix",
+                "ParameterValue": "${{parameters.serviceName}}/${{parameters.serviceEnv}}/"
+             },
+             {
+                "ParameterKey": "BuildId",
+                "ParameterValue": "$(Build.SourceVersion)"
+             }
+            ]            
+
+
+      - task: Gradle@2
+        displayName: Run functional tests 
+        inputs:
+          workingDirectory: ''
+          gradleWrapperFile: 'gradlew'
+          gradleOptions: '-Xmx5122m'
+          javaHomeOption: 'JDKVersion'
+          jdkVersionOption: '1.8'
+          jdkArchitectureOption: 'x64'
+          publishJUnitResults: false
+          testResultsFiles: '**/TEST-*.xml'
+          tasks: 'functionalTest'
+
+      # Publish Test Results
+      # Publish test results to Azure Pipelines
+      - task: PublishTestResults@2
+        displayName: Publish functional test results
+        inputs:
+          testResultsFormat: 'JUnit' # Options: JUnit, NUnit, VSTest, xUnit, cTest
+          testResultsFiles: '**/TEST-*.xml' 
+          #searchFolder: '$(System.DefaultWorkingDirectory)' # Optional
+          mergeTestResults: true # Optional
+          #failTaskOnFailedTests: false # Optional
+          testRunTitle: $(Build.SourceVersion) # Optional
+          #buildPlatform: # Optional
+          #buildConfiguration: # Optional
+          #publishRunAttachments: true # Optional

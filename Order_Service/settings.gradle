@@ -1,0 +1,5 @@
+rootProject.name = 'OrderAPI'
+
+include 'orderapi'
+include 'orderprocessor'
+include 'ordercommon'

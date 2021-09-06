@@ -1,0 +1,16 @@
+plugins {
+    id 'com.sd.example.java-application-conventions'
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web:2.4.1'
+    implementation 'com.amazonaws.serverless:aws-serverless-java-container-springboot2:1.5' 
+	implementation 'org.springdoc:springdoc-openapi-ui:1.5.1'
+	
+    compile project(':ordercommon')
+}
+
+application {
+    // Define the main class for the application.
+    mainClass = 'com.sd.example.OrderApplication'
+}

@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Sample Greeting Service
+
+Parameters:
+  ServiceName:
+    Description: Service Name
+    Type: String
+    Default: GreetingService
+    ConstraintDescription: Service Name
+
+  ServiceEnvironment:
+    Description: Service Environment
+    Type: String
+    Default: dev
+    ConstraintDescription: Service Environment
+
+  LambdaSourceBucket:
+    Description: AWS S3 Bucket in the Region which contains the Lambda Functions
+    Type: String
+    Default: api-artifacts-11
+    ConstraintDescription: Must be a valid bucket name containing Lambda functions, and in the same region.
+
+  LambdaSourceBucketPrefix:
+    Description: AWS S3 Bucket Prefix containing Lambda Functions
+    Type: String
+    Default: GreetingService/dev/
+    ConstraintDescription: Bucket prefix that contains the lambda functions.
+
+  LambdaFunctionPackage:
+    Description: Lambda function pacakge name
+    Type: String
+    Default: orderapi.zip
+    ConstraintDescription: Valid Lambda function package name deployed in the staging bucket
+
+  BuildId:
+    Description: Build Identifier
+    Type: String
+    Default: 2323232
+    ConstraintDescription: Build Identifier
+            
+Resources:
+
+  #---------------------------------------------------------
+  # IAM
+  #---------------------------------------------------------
+
+  BasicLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: BasicLambdaPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Action: ssm:GetParameter
+          Resource:
+          - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ServiceName}/${ServiceEnvironment}/*
+      Roles:
+      - !Ref ApiProxyRole
+      
+  #---------------------------------------------------------
+  # API Gateway
+  #---------------------------------------------------------
+      
+  RestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Description: Greeting API
+      Name: greeting
+      Parameters:
+        endpointConfigurationTypes: REGIONAL
+        basePath: ignore
+
+  RestApiDeployment:
+    DependsOn:
+      - RestApi
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId: !Ref RestApi
+
+  RestApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref RestApiDeployment
+      RestApiId: !Ref RestApi
+      StageName: stg-dev
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          LoggingLevel: INFO
+          DataTraceEnabled: false
+          MetricsEnabled: true
+      TracingEnabled: true
+
+  RestApiUsagePlanDefault:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: !Sub ${AWS::StackName}-default
+      ApiStages:
+        - ApiId: !Ref RestApi
+          Stage: !Ref RestApiStage
+      Description: !Sub Default usage plan for ${AWS::StackName}
+      Quota:
+        Limit: 1000000
+        Period: MONTH
+      Throttle:
+        BurstLimit: 10
+        RateLimit: 20
+
+  ApiKeySampleClient:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: !Sub api-samle-client-${ServiceEnvironment}
+      Enabled: True
+
+  UsagePlanKeyOnlineD2BHybrisShop:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKeySampleClient
+      KeyType: API_KEY
+      UsagePlanId: !Ref RestApiUsagePlanDefault
+  #---------------------------------------------------------
+  # LAMBDA - API PROXY REST
+  #---------------------------------------------------------
+
+  ApiProxyLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: 'Sample Greeting Service'
+      FunctionName: !Sub ${AWS::StackName}-apiproxy
+      Handler: com.sd.example.StreamLambdaHandler::handleRequest
+      Runtime: java8
+      MemorySize: 512
+      Timeout: 15
+      Role: !GetAtt 'ApiProxyRole.Arn'
+      Code:
+        S3Bucket: !Ref 'LambdaSourceBucket'
+        S3Key: !Join ['', [!Ref LambdaSourceBucketPrefix, !Ref 'BuildId' , '_orderapi.zip']]
+        
+  ApiProxyLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref ApiProxyLambda]]
+      RetentionInDays: 14
+
+  ApiProxyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: ProcessIncomingRequests
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - xray:PutTelemetryRecords
+            - xray:PutTraceSegments
+            Resource: '*'
+
+  ApiProxyGatewayPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt ApiProxyLambda.Arn
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${RestApi}/*"
+
+
+  #---------------------------------------------------------
+  # LAMBDA - PROCESSOR
+  #---------------------------------------------------------
+
+  MyProcessorLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Description: 'Sample Processor'
+      FunctionName: !Sub ${AWS::StackName}-myprocessor
+      Handler: com.sd.example.HandlerApiGateway::handleRequest
+      Runtime: java8
+      MemorySize: 128
+      Timeout: 5
+      Role: !GetAtt 'MyProcessorRole.Arn'
+      Code:
+        S3Bucket: !Ref 'LambdaSourceBucket'
+        S3Key: !Join ['', [!Ref LambdaSourceBucketPrefix, !Ref 'BuildId' , '_orderprocessor.zip']]
+        
+  MyProcessorLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Join ["", ["/aws/lambda/", !Ref MyProcessorLambda]]
+      RetentionInDays: 14
+
+  MyProcessorRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+      - PolicyName: ProcessIncomingRequests
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - xray:PutTelemetryRecords
+            - xray:PutTraceSegments
+            Resource: '*'
