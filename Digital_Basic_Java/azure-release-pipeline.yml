@@ -1,0 +1,23 @@
+trigger:
+  batch: true
+  branches:
+    include:
+      - release
+
+resources:
+  repositories:
+    - repository: azure-devops-templates
+      type: git
+      name: test/Digital_Base_Java
+
+stages:
+  - template: azure-pipelines/azure-stages-default.yml@azure-devops-templates
+    parameters:
+      serviceName: zuora
+      serviceVersion: 1.0.0 
+      environments:
+        - name: dev
+          #postmanEnvironment: acc-eu
+          awsAccount: 729524366783
+          awsRegion: eu-west-1
+          awsRoleName: AWSITGS-Administrator

@@ -1,0 +1,55 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Example Pet Store API with SpringBoot 
+
+Parameters:
+
+  ServiceName:
+    Description: Service name 
+    Type: String
+  
+  ServiceVersion:
+    Description: Service version
+    Type: String  
+
+  ServiceEnvironment:
+    Description: Service environment
+    Type: String
+    
+Globals:
+  Api:
+    # API Gateway regional endpoints
+    EndpointConfiguration: REGIONAL
+
+Resources:
+  
+  ZuoraApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+          
+  ZuoraFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ServiceName}-${ServiceEnvironment}
+      Description: Zuora API
+      Handler: example.HandlerZuora::handleRequest
+      Runtime: java8
+      CodeUri: ./build/distributions/zuora.zip
+      MemorySize: 2048
+      Policies: AWSLambdaBasicExecutionRole
+      Timeout: 60
+      Events:
+        GetAllPets:
+          Type: Api
+          Properties:
+            Path: /products
+            Method: post
+            RestApiId:
+              Ref: ZuoraApi              
+Outputs:
+  SpringBootPetStoreApi:
+    Description: URL for application
+    Value: !Sub 'https://${ZuoraApi}.execute-api.${AWS::Region}.amazonaws.com/products'
+    Export:
+      Name: ZuoraApi
